@@ -183,7 +183,7 @@ void blur_pixel_by_pixel(IMG *input, IMG *output, float **gaussian_weights, size
 		pthread_create(threads + j, NULL, blur_lines_wrapper, func_args + j);
 	}
 	for (j = 0; j < MAXTHREADING; j++)
-		pthread_join(threads[j], rv);
+		pthread_join(threads[j], &rv);
 }
 
 IMG *gaussian_blur(IMG *input, float stddev, size_t kernel_size){
