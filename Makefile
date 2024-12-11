@@ -12,7 +12,7 @@ project_name := benchmarks-divergence-of-gaussians
 
 # tool macros
 C := gcc
-CFLAGS := -lm -pthread -lpng -lpapi -I$(INC_PATH) -Wall
+CFLAGS := -lm -pthread -lpng -lpapi -I$(INC_PATH) -Wall -O3
 DBGFLAGS := -g
 CCOBJFLAGS := $(CFLAGS) -c
 
