@@ -5,7 +5,9 @@
 #include <papi.h>
 #include "papi_wrap.h"
 
-long long results[REGCOUNT] = {0};
+const int papi_events[] = {PAPI_TOT_CYC, PAPI_TOT_INS, PAPI_L2_DCM, PAPI_L2_DCA}; 
+const char* papi_event_names[] = {"TOT_CYC","TOT_INS","L2_DCM","L2_DCA"};
+
 
 void papi_init(void){
 	if (PAPI_library_init(PAPI_VER_CURRENT) != PAPI_VER_CURRENT){
@@ -21,10 +23,7 @@ void papi_init(void){
 int papi_get_eventset(void){ //Returns eventset
 	int events[REGCOUNT];
 	int eventset = PAPI_NULL;
-	events[0] = PAPI_TOT_CYC; //events[1] / events[0] = IPC
-	events[1] = PAPI_TOT_INS;
-//	events[2] = PAPI_L2_DCM; //events[2] / events[3] = Data cache miss rate
-//	events[3] = PAPI_L2_DCA;
+	memcpy(events, papi_events, REGCOUNT * sizeof(int));
 
 	if (PAPI_create_eventset(&eventset) != PAPI_OK){
 		fprintf(stderr, "Unable to create eventset\n");

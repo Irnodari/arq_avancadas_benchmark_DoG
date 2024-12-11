@@ -8,6 +8,7 @@
 #include "papi_wrap.h"
 #include "image_handler.h"
 #include "image_processor.h"
+#include "fio.h"
 
 struct foo_args{
 	IMG *input; IMG *output; float **gaussian_weights; size_t kernel_size; int ID; int maxthreading;
@@ -26,6 +27,8 @@ void *blur_lines_wrapper(void *args){
 		}
 	}
 	result = papi_end(&eventset);
+	print_to_csv(result, "BLUR_LINES_HORIZONTAL", argv->ID);
+	free(result);
 	papi_unregister_thread();
 	return NULL;
 }
@@ -42,13 +45,14 @@ void *blur_columns_wrapper(void *args){
 			blur_pixel(argv->input, argv->gaussian_weights, argv->kernel_size, j, i, &(argv->output->row_pointers[i][4 * j]));	
 		}	
 	}
-	return NULL;
 	result = papi_end(&eventset);
 	papi_unregister_thread();
-
+	print_to_csv(result, "BLUR_LINES_VERTICAL", argv->ID);
+	free(result);
+	return NULL;
 }
 
-void blur_pixel_by_pixel(IMG *input, IMG *output, float **gaussian_weights, size_t kernel_size, size_t maxthreading){
+void blur_pixel_by_pixel(IMG *input, IMG *output, float **gaussian_weights, size_t kernel_size, size_t maxthreading, char orientation){
 	int j;
 	void *rv;
 	pthread_t *threads;
@@ -64,7 +68,7 @@ void blur_pixel_by_pixel(IMG *input, IMG *output, float **gaussian_weights, size
 		func_args[j].maxthreading = maxthreading;
 	}
 	for (j = 0; j < maxthreading; j++){
-		pthread_create(threads + j, NULL, blur_lines_wrapper, func_args + j);
+		pthread_create(threads + j, NULL, orientation == 'c' ? blur_columns_wrapper : blur_lines_wrapper, func_args + j);
 	}
 	for (j = 0; j < maxthreading; j++)
 		pthread_join(threads[j], &rv);
@@ -73,7 +77,7 @@ void blur_pixel_by_pixel(IMG *input, IMG *output, float **gaussian_weights, size
 	return;
 }
 
-IMG *gaussian_blur(IMG *input, float stddev, size_t kernel_size, size_t maxthreading){
+IMG *gaussian_blur(IMG *input, float stddev, size_t kernel_size, size_t maxthreading, char orientation){
 	IMG *retval;
 	int i, j;
 	float **gaussian_weights = malloc((kernel_size + 1) * sizeof(float*));
@@ -92,8 +96,7 @@ IMG *gaussian_blur(IMG *input, float stddev, size_t kernel_size, size_t maxthrea
 		retval->row_pointers[i] = malloc(retval->rowsize);
 	}
 	
-	blur_pixel_by_pixel(input, retval, gaussian_weights, kernel_size, maxthreading);
-
+	blur_pixel_by_pixel(input, retval, gaussian_weights, kernel_size, maxthreading, orientation);
 	return retval;
 }
 
@@ -106,7 +109,7 @@ struct deriv_args{
 	size_t maxthreading;
 };
 
-void *deriv_img_wrap(void *args){
+void *deriv_img_horizontal_wrap(void *args){
 	struct deriv_args *argv = (struct deriv_args*)args;
 	png_bytep pixel1, pixel2;
 	papi_register_thread();
@@ -129,11 +132,41 @@ void *deriv_img_wrap(void *args){
 		}	
 	}
 	result = papi_end(&eventset);
+	print_to_csv(result, "DIFFERENTIATE_HORIZONTAL", argv->ID);
 	papi_unregister_thread();
 	return NULL;
 }
 
-void deriv_img(IMG *img, IMG *img2, float thao, float threshhold, size_t maxthreading){
+void *deriv_img_vertical_wrap(void *args){
+	struct deriv_args *argv = (struct deriv_args*)args;
+	png_bytep pixel1, pixel2;
+	papi_register_thread();
+	long long *result;
+	int eventset = papi_get_eventset();
+	papi_start(eventset);
+	for (int j = argv->ID; j < argv->img->width; j += argv->maxthreading){
+		for (int i = 0; i < argv->img->height; i++){
+			pixel1 = &(argv->img->row_pointers[i][4 * j]);
+			pixel2 = &(argv->img2->row_pointers[i][4 * j]);
+			for (int k = 0; k < 4; k++){
+				pixel1[k] = (png_byte)(pixel1[k] - argv->thao * pixel2[k]);
+			}
+			if (luminosity(pixel1[0], pixel1[1], pixel1[2]) < argv->threshhold){
+				pixel1[0] = pixel1[1] = pixel1[2] = INVERT * 255;
+			}
+			else
+				pixel1[0] = pixel1[1] = pixel1[2] = abs((INVERT - 1)) * 255;
+			
+		}	
+	}
+	result = papi_end(&eventset);
+	print_to_csv(result, "DIFFERENTIATE_HORIZONTAL", argv->ID);
+	papi_unregister_thread();
+	return NULL;
+}
+
+
+void deriv_img(IMG *img, IMG *img2, float thao, float threshhold, size_t maxthreading, char orientation){
 	pthread_t *threads;
 	struct deriv_args *args;
 	threads = malloc(maxthreading * sizeof(pthread_t));
@@ -149,7 +182,7 @@ void deriv_img(IMG *img, IMG *img2, float thao, float threshhold, size_t maxthre
 		args[i].maxthreading = maxthreading;
 	}
 	for (int i = 0; i < maxthreading; i++){
-		pthread_create(threads + i, NULL, deriv_img_wrap, args + i);	
+		pthread_create(threads + i, NULL, orientation == 'c' ? deriv_img_vertical_wrap : deriv_img_horizontal_wrap, args + i);	
 	}
 	for (int i = 0; i < maxthreading; i++){
 		pthread_join(threads[i], &ptr);	
@@ -159,11 +192,11 @@ void deriv_img(IMG *img, IMG *img2, float thao, float threshhold, size_t maxthre
 	return;
 }
 
-IMG *DoG(IMG *img, float stddev, int kernel_size, int kernel_size_2, float thao, float deviation_scaler, float threshhold, size_t maxthreading){
+IMG *DoG(IMG *img, float stddev, int kernel_size, int kernel_size_2, float thao, float deviation_scaler, float threshhold, size_t maxthreading, char orientation){
 	IMG *gauss1, *gauss2;
-	gauss1 = gaussian_blur(img, stddev, kernel_size, maxthreading);
-	gauss2 = gaussian_blur(img, stddev * deviation_scaler, kernel_size_2, maxthreading);
-	deriv_img(gauss1, gauss2, thao, threshhold, maxthreading);
+	gauss1 = gaussian_blur(img, stddev, kernel_size, maxthreading, orientation);
+	gauss2 = gaussian_blur(img, stddev * deviation_scaler, kernel_size_2, maxthreading, orientation);
+	deriv_img(gauss1, gauss2, thao, threshhold, maxthreading, orientation);
 	destroy_png(gauss2);
 	return gauss1;
 }

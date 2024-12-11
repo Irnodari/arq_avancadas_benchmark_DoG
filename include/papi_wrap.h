@@ -1,12 +1,14 @@
-#include <semaphore.h>
+#include <papi.h>
 
 #ifndef papi_wrap
 #define papi_wrap
 
 #define REGCOUNT 2
 
-extern sem_t semaphore;
 extern long long results[REGCOUNT];
+
+extern const int papi_events[];
+extern const char* papi_event_names[];
 
 void papi_init(void);
 

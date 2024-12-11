@@ -54,3 +54,6 @@ dkms.conf
 .ycm_extra_conf.py
 
 bin
+out
+debug
+*.swp*
