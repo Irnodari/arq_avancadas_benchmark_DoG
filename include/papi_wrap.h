@@ -3,7 +3,7 @@
 #ifndef papi_wrap
 #define papi_wrap
 
-#define REGCOUNT 2
+#define REGCOUNT 4
 
 extern long long results[REGCOUNT];
 

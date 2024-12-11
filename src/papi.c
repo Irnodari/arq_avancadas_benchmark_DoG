@@ -5,8 +5,8 @@
 #include <papi.h>
 #include "papi_wrap.h"
 
-const int papi_events[] = {PAPI_TOT_CYC, PAPI_TOT_INS, PAPI_L2_DCM, PAPI_L2_DCA}; 
-const char* papi_event_names[] = {"TOT_CYC","TOT_INS","L2_DCM","L2_DCA"};
+const int papi_events[] = {PAPI_TOT_CYC, PAPI_TOT_INS, PAPI_L2_DCM, PAPI_L3_TCM}; 
+const char* papi_event_names[] = {"TOT_CYC","TOT_INS","L2_DCM","L3_TCM"};
 
 
 void papi_init(void){
