@@ -12,7 +12,7 @@ project_name := benchmarks-divergence-of-gaussians
 
 # tool macros
 C := gcc
-CFLAGS := -lm -pthread -lpng -lpapi -I$(INC_PATH)
+CFLAGS := -lm -pthread -lpng -lpapi -I$(INC_PATH) -Wall
 DBGFLAGS := -g
 CCOBJFLAGS := $(CFLAGS) -c
 
@@ -72,3 +72,6 @@ clean:
 distclean:
 	@echo CLEAN $(CLEAN_LIST)
 	@rm -f $(DISTCLEAN_LIST)
+
+test:
+	@time ./bin/main ./img/img2.png ./img/img_out.png

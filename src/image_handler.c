@@ -6,8 +6,6 @@
 // https://gist.github.com/niw/5963798
 
 void write_png_file(char *filename, IMG *img){
-	int y;
-
   	FILE *fp = fopen(filename, "wb");
   	png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
   	png_infop info = png_create_info_struct(png);

@@ -16,4 +16,6 @@ IMG *read_png_file(char *filename);
 
 void write_png_file(char *filename, IMG *img);
 
+void destroy_png(IMG *img);
+
 #endif

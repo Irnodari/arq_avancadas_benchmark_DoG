@@ -1,5 +1,6 @@
 #ifndef image_processor
 #define image_processor
+#include <png.h>
 #include "image_handler.h"
 
 #define EULER 2.72
@@ -16,5 +17,7 @@ float luminosity(uint8_t R, uint8_t G, uint8_t B);
 float saturation(uint8_t R, uint8_t G, uint8_t B);
 
 float hue(uint8_t R, uint8_t G, uint8_t B);
+
+void blur_pixel(IMG *input, float **weights, size_t kernel_size, int coordx, int coordy, png_bytep pixel);
 
 #endif

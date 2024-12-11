@@ -5,6 +5,8 @@
 #include <papi.h>
 #include "papi_wrap.h"
 
+long long results[REGCOUNT] = {0};
+
 void papi_init(void){
 	if (PAPI_library_init(PAPI_VER_CURRENT) != PAPI_VER_CURRENT){
 		fprintf(stderr, "Unable to initialize papi library\n");
@@ -17,19 +19,18 @@ void papi_init(void){
 }
 
 int papi_get_eventset(void){ //Returns eventset
+	int events[REGCOUNT];
 	int eventset = PAPI_NULL;
-	int events[4];
-
 	events[0] = PAPI_TOT_CYC; //events[1] / events[0] = IPC
 	events[1] = PAPI_TOT_INS;
-	events[2] = PAPI_L2_DCM; //events[2] / events[3] = Data cache miss rate
-	events[3] = PAPI_L2_DCA;
+//	events[2] = PAPI_L2_DCM; //events[2] / events[3] = Data cache miss rate
+//	events[3] = PAPI_L2_DCA;
 
 	if (PAPI_create_eventset(&eventset) != PAPI_OK){
 		fprintf(stderr, "Unable to create eventset\n");
 		exit(1);
 	}
-	if (PAPI_add_events(eventset, events, 4) != PAPI_OK){
+	if (PAPI_add_events(eventset, events, REGCOUNT) != PAPI_OK){
 		fprintf(stderr, "Unable to add events\n");	
 		exit(1);
 	}
@@ -38,24 +39,23 @@ int papi_get_eventset(void){ //Returns eventset
 
 void papi_start(int eventset){
 	if (PAPI_start(eventset) != PAPI_OK){
-		fprintf(stderr, "Unable to start eventset");
+		fprintf(stderr, "Unable to start eventset\n");
 		exit(1);	
 	}
+	return;
 }
 
 long long *papi_end(int *eventset){
-	long long event_results[4];
-	long long *retval;
+	long long *rv, event_results[REGCOUNT];
 	if (PAPI_stop(*eventset, event_results) != PAPI_OK){
 		fprintf(stderr, "Unable to stop eventset\n");
 		exit(1);	
 	}
+	rv = malloc(REGCOUNT * sizeof(long long));
+	memcpy(rv, event_results, REGCOUNT * sizeof(long long));
 	PAPI_cleanup_eventset(*eventset);
 	PAPI_destroy_eventset(eventset);
-	*eventset = PAPI_NULL;
-	retval = malloc(4 * sizeof(long long));
-	memcpy(retval, event_results, 4 * sizeof(long long));
-	return retval;
+	return rv;
 }
 
 void papi_register_thread(void){
