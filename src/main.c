@@ -27,9 +27,9 @@ int main(int argc, char **argv){
 		if (img != NULL){
 			for (int j = MINTHREADS; j <= MAXTHREADS; j++){
 				threading = j;
-				res = DoG(img, DEVIATION, KERNEL_SIZE, KERNEL_SIZE_2, THAO, DEVIATION_SCALER, THRESHHOLD, 32, 'l');
+				res = DoG(img, DEVIATION, KERNEL_SIZE, KERNEL_SIZE_2, THAO, DEVIATION_SCALER, THRESHHOLD, j, 'l');
 				destroy_png(res);
-				res = DoG(img, DEVIATION, KERNEL_SIZE, KERNEL_SIZE_2, THAO, DEVIATION_SCALER, THRESHHOLD, 32, 'c');
+				res = DoG(img, DEVIATION, KERNEL_SIZE, KERNEL_SIZE_2, THAO, DEVIATION_SCALER, THRESHHOLD, j, 'c');
 			}
 			sprintf(fname, imgoutnametemplate, i, "_out");
 			write_png_file(fname, res);
