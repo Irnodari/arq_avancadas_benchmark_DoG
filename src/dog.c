@@ -5,10 +5,56 @@
 #include <string.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <sys/sysinfo.h>
 #include "papi_wrap.h"
 #include "image_handler.h"
 #include "image_processor.h"
 #include "fio.h"
+
+__attribute__((naked))
+void flushLine(unsigned char *line, size_t lineSize){
+	__asm__ volatile(
+		"movq %rsi, %rcx;"
+		".l0:"
+		"clflush -4(%rdi, %rcx, 4);"
+		"loop .l0;"
+		"ret;"
+	);
+}
+
+struct flushImgParams{
+	IMG *img;
+	int ID;
+};
+
+void *flushImgWrap(void *params){
+	struct flushImgParams *parameters = params;
+	int concurrency = get_nprocs();
+	for (int i = parameters->ID; i < parameters->img->height; i += concurrency)
+		flushLine(parameters->img->row_pointers[i], parameters->img->width);
+	return NULL;
+}
+
+void flushImage(IMG *img){
+	int len = get_nprocs();
+	void *rv;
+	pthread_t *threads;
+	struct flushImgParams *params;
+	params = malloc(len * sizeof(struct flushImgParams));
+	threads = malloc(len * sizeof(pthread_t));
+	for (size_t i = 0; i < len; i++){
+		params[i].img = img;
+		params[i].ID = i;	
+	}
+	for (size_t i = 0; i < len; i++){
+		pthread_create(threads + i, NULL, flushImgWrap, params + i);	
+	}
+	for (size_t i = 0; i < len; i++)
+		pthread_join(threads[i], &rv);
+	free(params);
+	free(threads);
+	return;
+}
 
 struct foo_args{
 	IMG *input; IMG *output; float **gaussian_weights; size_t kernel_size; int ID; int maxthreading;
@@ -27,7 +73,9 @@ void *blur_lines_wrapper(void *args){
 		}
 	}
 	result = papi_end(&eventset);
-	print_to_csv(result, "BLUR_LINES_HORIZONTAL", argv->ID);
+	char buffer[256];
+	sprintf(buffer, "BLUR_LINES_HORIZONTAL_KERNEL%lu", argv->kernel_size);
+	print_to_csv(result, buffer, argv->ID);
 	free(result);
 	papi_unregister_thread();
 	return NULL;
@@ -47,7 +95,9 @@ void *blur_columns_wrapper(void *args){
 	}
 	result = papi_end(&eventset);
 	papi_unregister_thread();
-	print_to_csv(result, "BLUR_LINES_VERTICAL", argv->ID);
+	char buffer[256];
+	sprintf(buffer, "BLUR_LINES_VERTICAL_KERNEL%lu", argv->kernel_size);
+	print_to_csv(result, buffer, argv->ID);
 	free(result);
 	return NULL;
 }
@@ -97,6 +147,12 @@ IMG *gaussian_blur(IMG *input, float stddev, size_t kernel_size, size_t maxthrea
 	}
 	
 	blur_pixel_by_pixel(input, retval, gaussian_weights, kernel_size, maxthreading, orientation);
+	for (i = 0; i <= kernel_size; i++){
+		free(gaussian_weights[i]);
+	}
+	free(gaussian_weights);
+
+
 	return retval;
 }
 
@@ -133,6 +189,7 @@ void *deriv_img_horizontal_wrap(void *args){
 	}
 	result = papi_end(&eventset);
 	print_to_csv(result, "DIFFERENTIATE_HORIZONTAL", argv->ID);
+	free(result);
 	papi_unregister_thread();
 	return NULL;
 }
@@ -160,8 +217,9 @@ void *deriv_img_vertical_wrap(void *args){
 		}	
 	}
 	result = papi_end(&eventset);
-	print_to_csv(result, "DIFFERENTIATE_HORIZONTAL", argv->ID);
-	papi_unregister_thread();
+	print_to_csv(result, "DIFFERENTIATE_VERTICAL", argv->ID);
+	free(result);
+	//papi_unregister_thread();
 	return NULL;
 }
 
@@ -194,8 +252,11 @@ void deriv_img(IMG *img, IMG *img2, float thao, float threshhold, size_t maxthre
 
 IMG *DoG(IMG *img, float stddev, int kernel_size, int kernel_size_2, float thao, float deviation_scaler, float threshhold, size_t maxthreading, char orientation){
 	IMG *gauss1, *gauss2;
+	flushImage(img);
 	gauss1 = gaussian_blur(img, stddev, kernel_size, maxthreading, orientation);
+	flushImage(img);
 	gauss2 = gaussian_blur(img, stddev * deviation_scaler, kernel_size_2, maxthreading, orientation);
+	flushImage(img);
 	deriv_img(gauss1, gauss2, thao, threshhold, maxthreading, orientation);
 	destroy_png(gauss2);
 	return gauss1;
